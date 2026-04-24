@@ -1,5 +1,6 @@
 /* =====================================================
    PODWRITTEN PRESS KIT — SHARED RENDERER
+   Reads from window.CLIENT written by Make/Airtable
    Edit this file to update ALL client press kit layouts
    ===================================================== */
 
@@ -16,57 +17,6 @@
     facebook:  `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>`,
   };
 
-  function esc(str) {
-    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  function socialButtons() {
-    return (C.social || []).map(s => `
-      <a class="social-btn" href="${esc(s.url)}" target="_blank" title="${esc(s.label)}">
-        ${ICONS[s.type] || ICONS.web}
-      </a>`).join('');
-  }
-
-  function navItems(sections) {
-    return sections.map(s => `
-      <button class="nav-item" onclick="go('${s.id}')">
-        <span class="nav-dot"></span>${esc(s.label)}
-      </button>`).join('');
-  }
-
-  function coverageItems() {
-    return (C.coverage || []).map(item => `
-      <div class="coverage-item" data-type="${esc(item.type || 'podcast')}">
-        <div>
-          <div class="coverage-pub">${esc(item.show)}</div>
-          ${item.episode ? `<div class="coverage-title">${esc(item.episode)}</div>` : ''}
-        </div>
-        ${item.url ? `<a class="coverage-link" href="${esc(item.url)}" target="_blank">Listen ↗</a>` : ''}
-      </div>`).join('');
-  }
-
-  function talkingPoints() {
-    return (C.talkingPoints || []).map((q, i) => `
-      <div class="question-item">
-        <span class="question-num">${String(i + 1).padStart(2, '0')}</span>
-        <span class="question-text">${esc(q)}</span>
-      </div>`).join('');
-  }
-
-  function contactRows() {
-    return (C.contactRows || []).map(row => `
-      <div class="contact-row">
-        <span class="contact-key">${esc(row.label)}</span>
-        <span class="contact-val">
-          ${row.url ? `<a href="${esc(row.url)}" target="_blank">${esc(row.value)}</a>` : esc(row.value)}
-        </span>
-      </div>`).join('');
-  }
-
-  function tags() {
-    return (C.topics || []).map(t => `<span class="tag">${esc(t)}</span>`).join('');
-  }
-
   const SECTIONS = [
     { id: 'about',     label: 'About' },
     { id: 'coverage',  label: 'Media Coverage' },
@@ -75,53 +25,175 @@
     { id: 'contact',   label: 'Contact' },
   ];
 
+  function esc(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function stripMarkdown(str) {
+    return String(str || '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/_([^_]+)_/g, '$1')
+      .replace(/<[^>]+>/g, '')
+      .trim();
+  }
+
+  function splitComma(str) {
+    if (!str) return [];
+    return String(str).split(',').map(s => s.trim()).filter(Boolean);
+  }
+
+  function parseBullets(str) {
+    if (!str) return [];
+    return String(str)
+      .split('\n')
+      .map(line => line.replace(/^[-*]\s*/, '').trim())
+      .filter(line => line.length > 0);
+  }
+
+  function buildCoverage() {
+    const shows  = splitComma(C.coverageShows);
+    const titles = splitComma(C.coverageTitles);
+    const links  = splitComma(C.coverageLinks);
+    const maxLen = Math.max(shows.length, titles.length, links.length);
+    if (maxLen === 0) return [];
+    const items = [];
+    for (let i = 0; i < maxLen; i++) {
+      const show  = shows[i]  || '';
+      const title = titles[i] || '';
+      const url   = links[i]  || '';
+      if (show.startsWith('rec') && show.length === 17) continue;
+      if (show || title) items.push({ show, episode: title, url, type: 'podcast' });
+    }
+    return items;
+  }
+
+  function buildPreviousPodcasts() {
+    const str = C.previousPodcasts || '';
+    const items = [];
+    const lineRegex = /\d+\.\s*\[([^\]]+)\]\(([^)]+)\)[^<\n]*/g;
+    let match;
+    while ((match = lineRegex.exec(str)) !== null) {
+      const show = match[1];
+      const url  = match[2];
+      const rest = str.slice(match.index + match[0].length);
+      const boldMatch = rest.match(/\*\*([^*]+)\*\*/);
+      const episode = boldMatch ? boldMatch[1].trim() : '';
+      items.push({ show, episode, url, type: 'podcast' });
+    }
+    return items;
+  }
+
+  function allCoverage() {
+    return [...buildCoverage(), ...buildPreviousPodcasts()];
+  }
+
+  function socialButtons() {
+    const socials = [];
+    if (C.instagram)  socials.push({ type: 'instagram', url: C.instagram,  label: C.instagram });
+    if (C.instagram2) socials.push({ type: 'instagram', url: C.instagram2, label: C.instagram2 });
+    if (C.youtube)    socials.push({ type: 'youtube',   url: C.youtube,    label: 'YouTube' });
+    if (C.tiktok)     socials.push({ type: 'tiktok',    url: C.tiktok,     label: 'TikTok' });
+    if (C.facebook)   socials.push({ type: 'facebook',  url: C.facebook,   label: 'Facebook' });
+    if (C.linkedin)   socials.push({ type: 'linkedin',  url: C.linkedin,   label: 'LinkedIn' });
+    if (C.podcast)    socials.push({ type: 'podcast',   url: C.podcast,    label: 'Podcast' });
+    if (C.website)    socials.push({ type: 'web',       url: C.website,    label: C.website.replace(/https?:\/\//,'') });
+    if (C.website2)   socials.push({ type: 'web',       url: C.website2,   label: C.website2.replace(/https?:\/\//,'') });
+    return socials.map(s => `<a class="social-btn" href="${esc(s.url)}" target="_blank" title="${esc(s.label)}">${ICONS[s.type] || ICONS.web}</a>`).join('');
+  }
+
+  function navItems() {
+    return SECTIONS.map(s => `<button class="nav-item" onclick="go('${s.id}')"><span class="nav-dot"></span>${esc(s.label)}</button>`).join('');
+  }
+
+  function coverageHTML() {
+    const items = allCoverage();
+    if (!items.length) return `<p style="color:var(--muted);font-style:italic;padding:20px 0;">No coverage added yet.</p>`;
+    return items.map(item => `
+      <div class="coverage-item" data-type="${esc(item.type || 'podcast')}">
+        <div>
+          <div class="coverage-pub">${esc(stripMarkdown(item.show))}</div>
+          ${item.episode ? `<div class="coverage-title">${esc(stripMarkdown(item.episode))}</div>` : ''}
+        </div>
+        ${item.url ? `<a class="coverage-link" href="${esc(item.url)}" target="_blank">Listen ↗</a>` : ''}
+      </div>`).join('');
+  }
+
+  function talkingPointsHTML() {
+    const points = parseBullets(C.talkingPoints);
+    if (!points.length) return `<p style="color:var(--muted);font-style:italic;">No talking points added yet.</p>`;
+    return points.map((q, i) => `
+      <div class="question-item">
+        <span class="question-num">${String(i + 1).padStart(2, '0')}</span>
+        <span class="question-text">${esc(q)}</span>
+      </div>`).join('');
+  }
+
+  function bioHTML() {
+    const bio = stripMarkdown(C.shortBio || '');
+    return bio.split('\n').filter(p => p.trim()).map(p => `<p class="bio-text">${esc(p.trim())}</p>`).join('');
+  }
+
+  function storyHTML() {
+    const story = stripMarkdown(C.longBio || '');
+    if (!story || story.toLowerCase().includes('delete later')) {
+      return `<p class="bio-text" style="color:var(--muted);font-style:italic;">Full story coming soon.</p>`;
+    }
+    return story.split('\n').filter(p => p.trim()).map(p => `<p class="bio-text">${esc(p.trim())}</p>`).join('');
+  }
+
+  function contactSocialsHTML() {
+    const pairs = [
+      { key: 'Instagram', val: C.instagram },
+      { key: 'Instagram', val: C.instagram2 },
+      { key: 'YouTube',   val: C.youtube },
+      { key: 'TikTok',    val: C.tiktok },
+      { key: 'LinkedIn',  val: C.linkedin },
+      { key: 'Facebook',  val: C.facebook },
+      { key: 'Podcast',   val: C.podcast },
+      { key: 'Website',   val: C.website },
+      { key: 'Website',   val: C.website2 },
+    ].filter(p => p.val);
+    return pairs.map(p => `
+      <div class="contact-row">
+        <span class="contact-key">${esc(p.key)}</span>
+        <span class="contact-val"><a href="${esc(p.val)}" target="_blank">${esc(p.val.replace(/https?:\/\//,''))}</a></span>
+      </div>`).join('');
+  }
+
   document.title = `${C.name} — Press Kit`;
 
   document.body.innerHTML = `
   <div class="topbar">
     <span class="topbar-name">${esc(C.name)}</span>
-    <button class="hamburger" onclick="toggleMenu()" aria-label="Menu">
-      <span></span><span></span><span></span>
-    </button>
+    <button class="hamburger" onclick="toggleMenu()" aria-label="Menu"><span></span><span></span><span></span></button>
   </div>
-  <div class="mobile-menu" id="mobileMenu">${navItems(SECTIONS)}</div>
+  <div class="mobile-menu" id="mobileMenu">${navItems()}</div>
   <div class="layout">
     <aside class="sidebar">
       <div class="sidebar-avatar">
-        ${C.photo ? `<img src="${esc(C.photo)}" alt="${esc(C.name)}" />` : `<span class="avatar-placeholder">${esc(C.name.split(' ').map(w=>w[0]).join(''))}</span>`}
+        ${C.photo ? `<img src="${esc(C.photo)}" alt="${esc(C.name)}" onerror="this.parentElement.innerHTML='<span class=\\'avatar-placeholder\\'>${esc(C.name.split(' ').map(w=>w[0]).join(''))}</span>'" />` : `<span class="avatar-placeholder">${esc(C.name.split(' ').map(w=>w[0]).join(''))}</span>`}
       </div>
       <div class="sidebar-name">${esc(C.name)}</div>
       ${C.title ? `<div class="sidebar-client-title">${esc(C.title)}</div>` : ''}
-      <nav class="sidebar-nav">${navItems(SECTIONS)}</nav>
+      <nav class="sidebar-nav">${navItems()}</nav>
       <div class="sidebar-socials">${socialButtons()}</div>
     </aside>
     <div class="main">
       <section id="about" class="section active">
-        <div class="banner">
-          <div class="banner-eyebrow">About</div>
-          <h1 class="banner-name">Biography</h1>
-        </div>
+        <div class="banner"><div class="banner-eyebrow">About</div><h1 class="banner-name">Biography</h1></div>
         <div class="content">
           <div class="about-tabs">
             <button class="about-tab active" onclick="switchTab('bio',this)">Short Bio</button>
             <button class="about-tab" onclick="switchTab('story',this)">Full Story</button>
           </div>
-          <div id="tab-bio" class="about-tab-content">
-            ${(C.bio || '').split('\n\n').map(p => `<p class="bio-text">${p.trim()}</p>`).join('')}
-            ${C.topics && C.topics.length ? `<div class="topics-label">Topics they speak on</div><div class="tags">${tags()}</div>` : ''}
-          </div>
-          <div id="tab-story" class="about-tab-content" style="display:none;">
-            ${C.story ? (C.story || '').split('\n\n').map(p => `<p class="bio-text">${p.trim()}</p>`).join('') : `<p class="bio-text" style="color:var(--muted);font-style:italic;">Full story coming soon.</p>`}
-          </div>
+          <div id="tab-bio" class="about-tab-content">${bioHTML()}</div>
+          <div id="tab-story" class="about-tab-content" style="display:none;">${storyHTML()}</div>
         </div>
         <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
       </section>
       <section id="coverage" class="section">
-        <div class="banner">
-          <div class="banner-eyebrow">Media Coverage</div>
-          <h1 class="banner-name">Press & Appearances</h1>
-          <p class="banner-sub">Podcast interviews, press features, and published articles.</p>
-        </div>
+        <div class="banner"><div class="banner-eyebrow">Media Coverage</div><h1 class="banner-name">Press & Appearances</h1><p class="banner-sub">Podcast interviews, press features, and published articles.</p></div>
         <div class="content">
           <div class="filter-row">
             <button class="filter-btn active" onclick="filterCoverage('all',this)">All</button>
@@ -129,18 +201,12 @@
             <button class="filter-btn" onclick="filterCoverage('press',this)">Press</button>
             <button class="filter-btn" onclick="filterCoverage('article',this)">Articles</button>
           </div>
-          <div class="coverage-list" id="coverageList">
-            ${coverageItems() || '<p style="color:var(--muted);font-style:italic;padding:20px 0;">No coverage added yet.</p>'}
-          </div>
+          <div class="coverage-list" id="coverageList">${coverageHTML()}</div>
         </div>
         <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
       </section>
       <section id="headshots" class="section">
-        <div class="banner">
-          <div class="banner-eyebrow">Headshots</div>
-          <h1 class="banner-name">Photos & Media</h1>
-          <p class="banner-sub">High-resolution photos cleared for press and editorial use.</p>
-        </div>
+        <div class="banner"><div class="banner-eyebrow">Headshots</div><h1 class="banner-name">Photos & Media</h1><p class="banner-sub">High-resolution photos cleared for press and editorial use.</p></div>
         <div class="content">
           <p style="font-size:15px;color:var(--muted);margin-bottom:28px;line-height:1.75;">All headshots and media assets are available in the Google Drive folder below.</p>
           ${C.driveFolder ? `<a class="drive-link-btn" href="${esc(C.driveFolder)}" target="_blank">↗ &nbsp;Open full photo library in Google Drive</a>` : `<p style="color:var(--muted);font-style:italic;">No photo folder linked yet.</p>`}
@@ -148,32 +214,23 @@
         <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
       </section>
       <section id="topics" class="section">
-        <div class="banner">
-          <div class="banner-eyebrow">Speaking Topics & Audiences</div>
-          <h1 class="banner-name">Topics & Talking Points</h1>
-        </div>
+        <div class="banner"><div class="banner-eyebrow">Speaking Topics & Audiences</div><h1 class="banner-name">Topics & Talking Points</h1></div>
         <div class="content">
           <p class="questions-intro">The following questions are designed to spark meaningful conversations. Feel free to adapt them to your format or audience.</p>
-          <div>${talkingPoints()}</div>
+          <div>${talkingPointsHTML()}</div>
         </div>
         <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
       </section>
       <section id="contact" class="section">
-        <div class="banner">
-          <div class="banner-eyebrow">Contact</div>
-          <h1 class="banner-name">Booking & Press</h1>
-          <p class="banner-sub">For interview bookings and media enquiries, get in touch below. We aim to respond within 24 hours.</p>
-        </div>
+        <div class="banner"><div class="banner-eyebrow">Contact</div><h1 class="banner-name">Booking & Press</h1><p class="banner-sub">For interview bookings and media enquiries, get in touch below. We aim to respond within 24 hours.</p></div>
         <div class="content">
           <div class="contact-grid">
             <div class="contact-group">
               <h3>Press & Bookings</h3>
-              ${contactRows()}
+              <div class="contact-row"><span class="contact-key">Email</span><span class="contact-val"><a href="mailto:${esc(C.contact || 'booking@podwritten.com')}">${esc(C.contact || 'booking@podwritten.com')}</a></span></div>
+              ${C.website ? `<div class="contact-row"><span class="contact-key">Website</span><span class="contact-val"><a href="${esc(C.website)}" target="_blank">${esc(C.website.replace(/https?:\/\//,''))}</a></span></div>` : ''}
             </div>
-            <div class="contact-group">
-              <h3>Social</h3>
-              ${(C.social || []).filter(s => s.label).map(s => `<div class="contact-row"><span class="contact-key">${esc(s.type)}</span><span class="contact-val"><a href="${esc(s.url)}" target="_blank">${esc(s.label)}</a></span></div>`).join('')}
-            </div>
+            <div class="contact-group"><h3>Social</h3>${contactSocialsHTML()}</div>
           </div>
         </div>
         <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
@@ -190,7 +247,8 @@
       if (b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${id}'`)) b.classList.add('active');
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    document.getElementById('mobileMenu').classList.remove('open');
+    const menu = document.getElementById('mobileMenu');
+    if (menu) menu.classList.remove('open');
   };
 
   window.switchTab = function(tab, btn) {
@@ -202,7 +260,8 @@
   };
 
   window.toggleMenu = function() {
-    document.getElementById('mobileMenu').classList.toggle('open');
+    const menu = document.getElementById('mobileMenu');
+    if (menu) menu.classList.toggle('open');
   };
 
   window.filterCoverage = function(type, btn) {
