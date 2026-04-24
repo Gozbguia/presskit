@@ -19,8 +19,8 @@
   const SECTIONS = [
     { id: 'about',     label: 'About' },
     { id: 'coverage',  label: 'Media Coverage' },
-    { id: 'headshots', label: 'Headshots' },
     { id: 'topics',    label: 'Speaking Topics & Audiences' },
+    { id: 'headshots', label: 'Headshots' },
     { id: 'contact',   label: 'Contact' },
   ];
 
@@ -209,7 +209,7 @@
       </aside>
       <div class="main">
         <section id="about" class="section active">
-          <div class="banner"><div class="banner-eyebrow">About</div><h1 class="banner-name">Biography</h1></div>
+          <div class="banner"><div class="banner-eyebrow">About</div><h1 class="banner-name">${esc(C.name)}</h1></div>
           <div class="content">
             <div class="about-tabs">
               <button class="about-tab active" onclick="switchTab('bio',this)">Short Bio</button>
@@ -233,19 +233,19 @@
           </div>
           <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
         </section>
-        <section id="headshots" class="section">
-          <div class="banner"><div class="banner-eyebrow">Headshots</div><h1 class="banner-name">Photos & Media</h1><p class="banner-sub">High-resolution photos cleared for press and editorial use.</p></div>
-          <div class="content">
-            <p style="font-size:15px;color:var(--muted);margin-bottom:28px;line-height:1.75;">All headshots and media assets are available in the Google Drive folder below.</p>
-            ${C.driveFolder ? `<a class="drive-link-btn" href="${esc(C.driveFolder)}" target="_blank">↗ &nbsp;Open full photo library in Google Drive</a>` : `<p style="color:var(--muted);font-style:italic;">No photo folder linked yet.</p>`}
-          </div>
-          <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
-        </section>
         <section id="topics" class="section">
           <div class="banner"><div class="banner-eyebrow">Speaking Topics & Audiences</div><h1 class="banner-name">Topics & Talking Points</h1></div>
           <div class="content">
             <p class="questions-intro">The following questions are designed to spark meaningful conversations. Feel free to adapt them to your format or audience.</p>
             <div>${talkingPointsHTML()}</div>
+          </div>
+          <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
+        </section>
+        <section id="headshots" class="section">
+          <div class="banner"><div class="banner-eyebrow">Headshots</div><h1 class="banner-name">Photos & Media</h1><p class="banner-sub">High-resolution photos cleared for press and editorial use.</p></div>
+          <div class="content">
+            <p style="font-size:15px;color:var(--muted);margin-bottom:28px;line-height:1.75;">All headshots and media assets are available in the Google Drive folder below.</p>
+            ${C.driveFolder ? `<a class="drive-link-btn" href="${esc(C.driveFolder)}" target="_blank">↗ &nbsp;Open full photo library in Google Drive</a>` : `<p style="color:var(--muted);font-style:italic;">No photo folder linked yet.</p>`}
           </div>
           <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
         </section>
