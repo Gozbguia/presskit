@@ -1,11 +1,10 @@
 /* =====================================================
    PODWRITTEN PRESS KIT — SHARED RENDERER
-   Reads from window.CLIENT written by Make/Airtable
+   Fetches config.json written by Make/Airtable
    Edit this file to update ALL client press kit layouts
    ===================================================== */
 
 (function () {
-  const C = window.CLIENT;
 
   const ICONS = {
     instagram: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>`,
@@ -25,6 +24,27 @@
     { id: 'contact',   label: 'Contact' },
   ];
 
+  /* ── Show loading state ──────────────────────────── */
+  document.body.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'DM Sans',sans-serif;color:#888;font-size:13px;letter-spacing:0.1em;text-transform:uppercase;">
+      Loading…
+    </div>`;
+
+  /* ── Fetch config.json ───────────────────────────── */
+  fetch('config.json?' + Date.now())
+    .then(r => {
+      if (!r.ok) throw new Error('Config not found');
+      return r.json();
+    })
+    .then(C => render(C))
+    .catch(err => {
+      document.body.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'DM Sans',sans-serif;color:#888;font-size:14px;">
+          Unable to load press kit. Please try again later.
+        </div>`;
+    });
+
+  /* ── Helpers ─────────────────────────────────────── */
   function esc(str) {
     return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
@@ -34,6 +54,7 @@
       .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
       .replace(/\*\*([^*]+)\*\*/g, '$1')
       .replace(/_([^_]+)_/g, '$1')
+      .replace(/<https?:[^>]+>/g, '')
       .replace(/<[^>]+>/g, '')
       .trim();
   }
@@ -47,232 +68,230 @@
     if (!str) return [];
     return String(str)
       .split('\n')
-      .map(line => line.replace(/^[-*]\s*/, '').trim())
-      .filter(line => line.length > 0);
+      .map(line => line.replace(/^[-*\d.]\s*/, '').trim())
+      .filter(line => line.length > 2);
   }
 
-  function buildCoverage() {
+  function buildCoverage(C) {
     const shows  = splitComma(C.coverageShows);
     const titles = splitComma(C.coverageTitles);
     const links  = splitComma(C.coverageLinks);
     const maxLen = Math.max(shows.length, titles.length, links.length);
-    if (maxLen === 0) return [];
     const items = [];
     for (let i = 0; i < maxLen; i++) {
-      const show  = shows[i]  || '';
-      const title = titles[i] || '';
-      const url   = links[i]  || '';
+      const show = shows[i] || '';
       if (show.startsWith('rec') && show.length === 17) continue;
-      if (show || title) items.push({ show, episode: title, url, type: 'podcast' });
+      items.push({ show, episode: titles[i] || '', url: links[i] || '', type: 'podcast' });
     }
     return items;
   }
 
-  function buildPreviousPodcasts() {
+  function buildPreviousPodcasts(C) {
     const str = C.previousPodcasts || '';
     const items = [];
-    const lineRegex = /\d+\.\s*\[([^\]]+)\]\(([^)]+)\)[^<\n]*/g;
+    const lineRegex = /\d+\.\s*\[([^\]]+)\]\(([^)]+)\)/g;
     let match;
     while ((match = lineRegex.exec(str)) !== null) {
       const show = match[1];
       const url  = match[2];
       const rest = str.slice(match.index + match[0].length);
-      const boldMatch = rest.match(/\*\*([^*]+)\*\*/);
+      const boldMatch = rest.match(/\*\*([^*\n]+)\*\*/);
       const episode = boldMatch ? boldMatch[1].trim() : '';
       items.push({ show, episode, url, type: 'podcast' });
     }
     return items;
   }
 
-  function allCoverage() {
-    return [...buildCoverage(), ...buildPreviousPodcasts()];
-  }
+  /* ── Render ─────────────────────────────────────── */
+  function render(C) {
 
-  function socialButtons() {
-    const socials = [];
-    if (C.instagram)  socials.push({ type: 'instagram', url: C.instagram,  label: C.instagram });
-    if (C.instagram2) socials.push({ type: 'instagram', url: C.instagram2, label: C.instagram2 });
-    if (C.youtube)    socials.push({ type: 'youtube',   url: C.youtube,    label: 'YouTube' });
-    if (C.tiktok)     socials.push({ type: 'tiktok',    url: C.tiktok,     label: 'TikTok' });
-    if (C.facebook)   socials.push({ type: 'facebook',  url: C.facebook,   label: 'Facebook' });
-    if (C.linkedin)   socials.push({ type: 'linkedin',  url: C.linkedin,   label: 'LinkedIn' });
-    if (C.podcast)    socials.push({ type: 'podcast',   url: C.podcast,    label: 'Podcast' });
-    if (C.website)    socials.push({ type: 'web',       url: C.website,    label: C.website.replace(/https?:\/\//,'') });
-    if (C.website2)   socials.push({ type: 'web',       url: C.website2,   label: C.website2.replace(/https?:\/\//,'') });
-    return socials.map(s => `<a class="social-btn" href="${esc(s.url)}" target="_blank" title="${esc(s.label)}">${ICONS[s.type] || ICONS.web}</a>`).join('');
-  }
+    const allCoverage = [...buildCoverage(C), ...buildPreviousPodcasts(C)];
 
-  function navItems() {
-    return SECTIONS.map(s => `<button class="nav-item" onclick="go('${s.id}')"><span class="nav-dot"></span>${esc(s.label)}</button>`).join('');
-  }
-
-  function coverageHTML() {
-    const items = allCoverage();
-    if (!items.length) return `<p style="color:var(--muted);font-style:italic;padding:20px 0;">No coverage added yet.</p>`;
-    return items.map(item => `
-      <div class="coverage-item" data-type="${esc(item.type || 'podcast')}">
-        <div>
-          <div class="coverage-pub">${esc(stripMarkdown(item.show))}</div>
-          ${item.episode ? `<div class="coverage-title">${esc(stripMarkdown(item.episode))}</div>` : ''}
-        </div>
-        ${item.url ? `<a class="coverage-link" href="${esc(item.url)}" target="_blank">Listen ↗</a>` : ''}
-      </div>`).join('');
-  }
-
-  function talkingPointsHTML() {
-    const points = parseBullets(C.talkingPoints);
-    if (!points.length) return `<p style="color:var(--muted);font-style:italic;">No talking points added yet.</p>`;
-    return points.map((q, i) => `
-      <div class="question-item">
-        <span class="question-num">${String(i + 1).padStart(2, '0')}</span>
-        <span class="question-text">${esc(q)}</span>
-      </div>`).join('');
-  }
-
-  function bioHTML() {
-    const bio = stripMarkdown(C.shortBio || '');
-    return bio.split('\n').filter(p => p.trim()).map(p => `<p class="bio-text">${esc(p.trim())}</p>`).join('');
-  }
-
-  function storyHTML() {
-    const story = stripMarkdown(C.longBio || '');
-    if (!story || story.toLowerCase().includes('delete later')) {
-      return `<p class="bio-text" style="color:var(--muted);font-style:italic;">Full story coming soon.</p>`;
+    function navItems() {
+      return SECTIONS.map(s => `<button class="nav-item" onclick="go('${s.id}')"><span class="nav-dot"></span>${esc(s.label)}</button>`).join('');
     }
-    return story.split('\n').filter(p => p.trim()).map(p => `<p class="bio-text">${esc(p.trim())}</p>`).join('');
-  }
 
-  function contactSocialsHTML() {
-    const pairs = [
-      { key: 'Instagram', val: C.instagram },
-      { key: 'Instagram', val: C.instagram2 },
-      { key: 'YouTube',   val: C.youtube },
-      { key: 'TikTok',    val: C.tiktok },
-      { key: 'LinkedIn',  val: C.linkedin },
-      { key: 'Facebook',  val: C.facebook },
-      { key: 'Podcast',   val: C.podcast },
-      { key: 'Website',   val: C.website },
-      { key: 'Website',   val: C.website2 },
-    ].filter(p => p.val);
-    return pairs.map(p => `
-      <div class="contact-row">
-        <span class="contact-key">${esc(p.key)}</span>
-        <span class="contact-val"><a href="${esc(p.val)}" target="_blank">${esc(p.val.replace(/https?:\/\//,''))}</a></span>
-      </div>`).join('');
-  }
+    function socialButtons() {
+      const socials = [];
+      if (C.instagram)  socials.push({ type: 'instagram', url: C.instagram,  label: C.instagram });
+      if (C.instagram2) socials.push({ type: 'instagram', url: C.instagram2, label: C.instagram2 });
+      if (C.youtube)    socials.push({ type: 'youtube',   url: C.youtube,    label: 'YouTube' });
+      if (C.tiktok)     socials.push({ type: 'tiktok',    url: C.tiktok,     label: 'TikTok' });
+      if (C.facebook)   socials.push({ type: 'facebook',  url: C.facebook,   label: 'Facebook' });
+      if (C.linkedin)   socials.push({ type: 'linkedin',  url: C.linkedin,   label: 'LinkedIn' });
+      if (C.podcast)    socials.push({ type: 'podcast',   url: C.podcast,    label: 'Podcast' });
+      if (C.website)    socials.push({ type: 'web',       url: C.website,    label: C.website.replace(/https?:\/\//,'') });
+      if (C.website2)   socials.push({ type: 'web',       url: C.website2,   label: C.website2.replace(/https?:\/\//,'') });
+      return socials.map(s => `<a class="social-btn" href="${esc(s.url)}" target="_blank" title="${esc(s.label)}">${ICONS[s.type] || ICONS.web}</a>`).join('');
+    }
 
-  document.title = `${C.name} — Press Kit`;
+    function coverageHTML() {
+      if (!allCoverage.length) return `<p style="color:var(--muted);font-style:italic;padding:20px 0;">No coverage added yet.</p>`;
+      return allCoverage.map(item => `
+        <div class="coverage-item" data-type="${esc(item.type)}">
+          <div>
+            <div class="coverage-pub">${esc(stripMarkdown(item.show))}</div>
+            ${item.episode ? `<div class="coverage-title">${esc(stripMarkdown(item.episode))}</div>` : ''}
+          </div>
+          ${item.url ? `<a class="coverage-link" href="${esc(item.url)}" target="_blank">Listen ↗</a>` : ''}
+        </div>`).join('');
+    }
 
-  document.body.innerHTML = `
-  <div class="topbar">
-    <span class="topbar-name">${esc(C.name)}</span>
-    <button class="hamburger" onclick="toggleMenu()" aria-label="Menu"><span></span><span></span><span></span></button>
-  </div>
-  <div class="mobile-menu" id="mobileMenu">${navItems()}</div>
-  <div class="layout">
-    <aside class="sidebar">
-      <div class="sidebar-avatar">
-        ${C.photo ? `<img src="${esc(C.photo)}" alt="${esc(C.name)}" onerror="this.parentElement.innerHTML='<span class=\\'avatar-placeholder\\'>${esc(C.name.split(' ').map(w=>w[0]).join(''))}</span>'" />` : `<span class="avatar-placeholder">${esc(C.name.split(' ').map(w=>w[0]).join(''))}</span>`}
-      </div>
-      <div class="sidebar-name">${esc(C.name)}</div>
-      ${C.title ? `<div class="sidebar-client-title">${esc(C.title)}</div>` : ''}
-      <nav class="sidebar-nav">${navItems()}</nav>
-      <div class="sidebar-socials">${socialButtons()}</div>
-    </aside>
-    <div class="main">
-      <section id="about" class="section active">
-        <div class="banner"><div class="banner-eyebrow">About</div><h1 class="banner-name">Biography</h1></div>
-        <div class="content">
-          <div class="about-tabs">
-            <button class="about-tab active" onclick="switchTab('bio',this)">Short Bio</button>
-            <button class="about-tab" onclick="switchTab('story',this)">Full Story</button>
-          </div>
-          <div id="tab-bio" class="about-tab-content">${bioHTML()}</div>
-          <div id="tab-story" class="about-tab-content" style="display:none;">${storyHTML()}</div>
-        </div>
-        <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
-      </section>
-      <section id="coverage" class="section">
-        <div class="banner"><div class="banner-eyebrow">Media Coverage</div><h1 class="banner-name">Press & Appearances</h1><p class="banner-sub">Podcast interviews, press features, and published articles.</p></div>
-        <div class="content">
-          <div class="filter-row">
-            <button class="filter-btn active" onclick="filterCoverage('all',this)">All</button>
-            <button class="filter-btn" onclick="filterCoverage('podcast',this)">Podcasts</button>
-            <button class="filter-btn" onclick="filterCoverage('press',this)">Press</button>
-            <button class="filter-btn" onclick="filterCoverage('article',this)">Articles</button>
-          </div>
-          <div class="coverage-list" id="coverageList">${coverageHTML()}</div>
-        </div>
-        <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
-      </section>
-      <section id="headshots" class="section">
-        <div class="banner"><div class="banner-eyebrow">Headshots</div><h1 class="banner-name">Photos & Media</h1><p class="banner-sub">High-resolution photos cleared for press and editorial use.</p></div>
-        <div class="content">
-          <p style="font-size:15px;color:var(--muted);margin-bottom:28px;line-height:1.75;">All headshots and media assets are available in the Google Drive folder below.</p>
-          ${C.driveFolder ? `<a class="drive-link-btn" href="${esc(C.driveFolder)}" target="_blank">↗ &nbsp;Open full photo library in Google Drive</a>` : `<p style="color:var(--muted);font-style:italic;">No photo folder linked yet.</p>`}
-        </div>
-        <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
-      </section>
-      <section id="topics" class="section">
-        <div class="banner"><div class="banner-eyebrow">Speaking Topics & Audiences</div><h1 class="banner-name">Topics & Talking Points</h1></div>
-        <div class="content">
-          <p class="questions-intro">The following questions are designed to spark meaningful conversations. Feel free to adapt them to your format or audience.</p>
-          <div>${talkingPointsHTML()}</div>
-        </div>
-        <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
-      </section>
-      <section id="contact" class="section">
-        <div class="banner"><div class="banner-eyebrow">Contact</div><h1 class="banner-name">Booking & Press</h1><p class="banner-sub">For interview bookings and media enquiries, get in touch below. We aim to respond within 24 hours.</p></div>
-        <div class="content">
-          <div class="contact-grid">
-            <div class="contact-group">
-              <h3>Press & Bookings</h3>
-              <div class="contact-row"><span class="contact-key">Email</span><span class="contact-val"><a href="mailto:${esc(C.contact || 'booking@podwritten.com')}">${esc(C.contact || 'booking@podwritten.com')}</a></span></div>
-              ${C.website ? `<div class="contact-row"><span class="contact-key">Website</span><span class="contact-val"><a href="${esc(C.website)}" target="_blank">${esc(C.website.replace(/https?:\/\//,''))}</a></span></div>` : ''}
-            </div>
-            <div class="contact-group"><h3>Social</h3>${contactSocialsHTML()}</div>
-          </div>
-        </div>
-        <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
-      </section>
+    function talkingPointsHTML() {
+      const points = parseBullets(C.talkingPoints);
+      if (!points.length) return `<p style="color:var(--muted);font-style:italic;">No talking points added yet.</p>`;
+      return points.map((q, i) => `
+        <div class="question-item">
+          <span class="question-num">${String(i+1).padStart(2,'0')}</span>
+          <span class="question-text">${esc(q)}</span>
+        </div>`).join('');
+    }
+
+    function bioHTML() {
+      const bio = stripMarkdown(C.shortBio || '');
+      return bio.split('\n').filter(p => p.trim().length > 1).map(p => `<p class="bio-text">${esc(p.trim())}</p>`).join('') || `<p class="bio-text" style="color:var(--muted);font-style:italic;">Bio coming soon.</p>`;
+    }
+
+    function storyHTML() {
+      const story = stripMarkdown(C.longBio || '');
+      if (!story || story.toLowerCase().includes('delete later')) {
+        return `<p class="bio-text" style="color:var(--muted);font-style:italic;">Full story coming soon.</p>`;
+      }
+      return story.split('\n').filter(p => p.trim().length > 1).map(p => `<p class="bio-text">${esc(p.trim())}</p>`).join('');
+    }
+
+    function contactSocialsHTML() {
+      return [
+        { key: 'Instagram', val: C.instagram },
+        { key: 'Instagram', val: C.instagram2 },
+        { key: 'YouTube',   val: C.youtube },
+        { key: 'TikTok',    val: C.tiktok },
+        { key: 'LinkedIn',  val: C.linkedin },
+        { key: 'Facebook',  val: C.facebook },
+        { key: 'Podcast',   val: C.podcast },
+        { key: 'Website',   val: C.website },
+        { key: 'Website',   val: C.website2 },
+      ].filter(p => p.val).map(p => `
+        <div class="contact-row">
+          <span class="contact-key">${esc(p.key)}</span>
+          <span class="contact-val"><a href="${esc(p.val)}" target="_blank">${esc(p.val.replace(/https?:\/\//,''))}</a></span>
+        </div>`).join('');
+    }
+
+    const initials = esc((C.name||'').split(' ').map(w=>w[0]).join(''));
+
+    document.title = `${C.name} — Press Kit`;
+    document.body.innerHTML = `
+    <div class="topbar">
+      <span class="topbar-name">${esc(C.name)}</span>
+      <button class="hamburger" onclick="toggleMenu()" aria-label="Menu"><span></span><span></span><span></span></button>
     </div>
-  </div>`;
+    <div class="mobile-menu" id="mobileMenu">${navItems()}</div>
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-avatar">
+          ${C.photo ? `<img src="${esc(C.photo)}" alt="${esc(C.name)}" onerror="this.parentElement.innerHTML='<span class=\\'avatar-placeholder\\'>${initials}</span>'" />` : `<span class="avatar-placeholder">${initials}</span>`}
+        </div>
+        <div class="sidebar-name">${esc(C.name)}</div>
+        ${C.title ? `<div class="sidebar-client-title">${esc(C.title)}</div>` : ''}
+        <nav class="sidebar-nav">${navItems()}</nav>
+        <div class="sidebar-socials">${socialButtons()}</div>
+      </aside>
+      <div class="main">
+        <section id="about" class="section active">
+          <div class="banner"><div class="banner-eyebrow">About</div><h1 class="banner-name">Biography</h1></div>
+          <div class="content">
+            <div class="about-tabs">
+              <button class="about-tab active" onclick="switchTab('bio',this)">Short Bio</button>
+              <button class="about-tab" onclick="switchTab('story',this)">Full Story</button>
+            </div>
+            <div id="tab-bio" class="about-tab-content">${bioHTML()}</div>
+            <div id="tab-story" class="about-tab-content" style="display:none;">${storyHTML()}</div>
+          </div>
+          <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
+        </section>
+        <section id="coverage" class="section">
+          <div class="banner"><div class="banner-eyebrow">Media Coverage</div><h1 class="banner-name">Press & Appearances</h1><p class="banner-sub">Podcast interviews, press features, and published articles.</p></div>
+          <div class="content">
+            <div class="filter-row">
+              <button class="filter-btn active" onclick="filterCoverage('all',this)">All</button>
+              <button class="filter-btn" onclick="filterCoverage('podcast',this)">Podcasts</button>
+              <button class="filter-btn" onclick="filterCoverage('press',this)">Press</button>
+              <button class="filter-btn" onclick="filterCoverage('article',this)">Articles</button>
+            </div>
+            <div class="coverage-list" id="coverageList">${coverageHTML()}</div>
+          </div>
+          <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
+        </section>
+        <section id="headshots" class="section">
+          <div class="banner"><div class="banner-eyebrow">Headshots</div><h1 class="banner-name">Photos & Media</h1><p class="banner-sub">High-resolution photos cleared for press and editorial use.</p></div>
+          <div class="content">
+            <p style="font-size:15px;color:var(--muted);margin-bottom:28px;line-height:1.75;">All headshots and media assets are available in the Google Drive folder below.</p>
+            ${C.driveFolder ? `<a class="drive-link-btn" href="${esc(C.driveFolder)}" target="_blank">↗ &nbsp;Open full photo library in Google Drive</a>` : `<p style="color:var(--muted);font-style:italic;">No photo folder linked yet.</p>`}
+          </div>
+          <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
+        </section>
+        <section id="topics" class="section">
+          <div class="banner"><div class="banner-eyebrow">Speaking Topics & Audiences</div><h1 class="banner-name">Topics & Talking Points</h1></div>
+          <div class="content">
+            <p class="questions-intro">The following questions are designed to spark meaningful conversations. Feel free to adapt them to your format or audience.</p>
+            <div>${talkingPointsHTML()}</div>
+          </div>
+          <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
+        </section>
+        <section id="contact" class="section">
+          <div class="banner"><div class="banner-eyebrow">Contact</div><h1 class="banner-name">Booking & Press</h1><p class="banner-sub">For interview bookings and media enquiries, get in touch below. We aim to respond within 24 hours.</p></div>
+          <div class="content">
+            <div class="contact-grid">
+              <div class="contact-group">
+                <h3>Press & Bookings</h3>
+                <div class="contact-row"><span class="contact-key">Email</span><span class="contact-val"><a href="mailto:${esc(C.contact||'booking@podwritten.com')}">${esc(C.contact||'booking@podwritten.com')}</a></span></div>
+                ${C.website ? `<div class="contact-row"><span class="contact-key">Website</span><span class="contact-val"><a href="${esc(C.website)}" target="_blank">${esc(C.website.replace(/https?:\/\//,''))}</a></span></div>` : ''}
+              </div>
+              <div class="contact-group"><h3>Social</h3>${contactSocialsHTML()}</div>
+            </div>
+          </div>
+          <footer><span>Created by <a href="https://podwritten.com" target="_blank">podwritten.com</a></span></footer>
+        </section>
+      </div>
+    </div>`;
 
-  window.go = function(id) {
-    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-    const el = document.getElementById(id);
-    if (el) el.classList.add('active');
-    document.querySelectorAll('.nav-item').forEach(b => {
-      if (b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${id}'`)) b.classList.add('active');
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    const menu = document.getElementById('mobileMenu');
-    if (menu) menu.classList.remove('open');
-  };
+    window.go = function(id) {
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+      const el = document.getElementById(id);
+      if (el) el.classList.add('active');
+      document.querySelectorAll('.nav-item').forEach(b => {
+        if (b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${id}'`)) b.classList.add('active');
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const menu = document.getElementById('mobileMenu');
+      if (menu) menu.classList.remove('open');
+    };
 
-  window.switchTab = function(tab, btn) {
-    document.querySelectorAll('.about-tab-content').forEach(t => t.style.display = 'none');
-    document.querySelectorAll('.about-tab').forEach(b => b.classList.remove('active'));
-    const el = document.getElementById('tab-' + tab);
-    if (el) el.style.display = 'block';
-    btn.classList.add('active');
-  };
+    window.switchTab = function(tab, btn) {
+      document.querySelectorAll('.about-tab-content').forEach(t => t.style.display = 'none');
+      document.querySelectorAll('.about-tab').forEach(b => b.classList.remove('active'));
+      const el = document.getElementById('tab-' + tab);
+      if (el) el.style.display = 'block';
+      btn.classList.add('active');
+    };
 
-  window.toggleMenu = function() {
-    const menu = document.getElementById('mobileMenu');
-    if (menu) menu.classList.toggle('open');
-  };
+    window.toggleMenu = function() {
+      const menu = document.getElementById('mobileMenu');
+      if (menu) menu.classList.toggle('open');
+    };
 
-  window.filterCoverage = function(type, btn) {
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelectorAll('#coverageList .coverage-item').forEach(item => {
-      item.style.display = (type === 'all' || item.dataset.type === type) ? 'flex' : 'none';
-    });
-  };
+    window.filterCoverage = function(type, btn) {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('#coverageList .coverage-item').forEach(item => {
+        item.style.display = (type === 'all' || item.dataset.type === type) ? 'flex' : 'none';
+      });
+    };
 
-  const firstNav = document.querySelector('.sidebar .nav-item');
-  if (firstNav) firstNav.classList.add('active');
+    const firstNav = document.querySelector('.sidebar .nav-item');
+    if (firstNav) firstNav.classList.add('active');
+  }
 
 })();
