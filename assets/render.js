@@ -194,7 +194,7 @@
     document.body.innerHTML = `
     <div class="topbar">
       <div style="display:flex;align-items:center;gap:10px;">
-        ${(C.PhotoURL || C.photo) ? `<img src="${esc(C.PhotoURL || C.photo)}" alt="${esc(C.name)}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:1.5px solid #e8e8e8;" onerror="this.style.display='none'" />` : ''}
+        ${(C.PhotoURL || C.photo) ? `<img src="${esc(C.PhotoURL || C.photo)}" alt="${esc(C.name)}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:1.5px solid #e8e8e8;" onerror="this.style.display='none'" />` : ''}
         <span class="topbar-name">${esc(C.name)}</span>
       </div>
       <button class="hamburger" onclick="toggleMenu()" aria-label="Menu"><span></span><span></span><span></span></button>
